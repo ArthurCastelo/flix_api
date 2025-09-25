@@ -1,19 +1,47 @@
 from django.shortcuts import render
 from rest_framework import generics
 from movies.models import Movies
-from movies.serializers import MoviesSerializer
+from movies.serializers import MoviesSerializer,MovieListDetailSerializer
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, views, response, status
+from app.permissions import GlobalDefaultPermission
+from django.db.models import Avg,Count
+from reviews.models import Review
+
 
 
 class MoviesCreateListAPIView(generics.ListCreateAPIView):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,GlobalDefaultPermission)
+    queryset = Movies.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return MovieListDetailSerializer
+        return MoviesSerializer
+
+class MoviesRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (IsAuthenticated,GlobalDefaultPermission)
     queryset = Movies.objects.all()
     serializer_class = MoviesSerializer
 
-class MoviesRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = (IsAuthenticated,)
+class MovieStatsView(views.APIView):
+    permission_classes = (IsAuthenticated, GlobalDefaultPermission,)
     queryset = Movies.objects.all()
-    serializer_class = MoviesSerializer
+
+    def get(self, request):
+        total_movies = self.queryset.count()
+        movies_by_genre = self.queryset.values('genre__name').annotate(count=Count('id'))
+        total_reviews = Review.objects.count()
+        average_stars = Review.objects.aggregate(avg_stars=Avg('stars'))['avg_stars']
+
+        data = {
+            'total_movies': total_movies,
+            'movies_by_genre': movies_by_genre,
+            'total_reviews': total_reviews,
+            'average_stars': round(average_stars, 1) if average_stars else 0,
+        }
+
+    
 
 
 
